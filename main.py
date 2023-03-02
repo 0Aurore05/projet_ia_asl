@@ -7,9 +7,16 @@ import tkinter
 import tkinter.messagebox
 import customtkinter
 
-customtkinter.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
-customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
+# Model import
+from ultralytics import YOLO
+import numpy
+import random
+import time
 
+customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
+customtkinter.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
+
+image_target_size = 300
 
 class App(customtkinter.CTk):
   def __init__(self):
@@ -29,32 +36,130 @@ class App(customtkinter.CTk):
     self.sidebar_frame.grid(row=0, column=0, rowspan=4, sticky="nsew")
     self.sidebar_frame.grid_rowconfigure(4, weight=1)
 
+    self.logo_label = customtkinter.CTkLabel(self.sidebar_frame, text="CustomTkinter", font=customtkinter.CTkFont(size=20, weight="bold"))
+    self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
     # create tabview
     self.tabview = customtkinter.CTkTabview(self, width=250)
     self.tabview.grid(row=0, column=2, padx=(20, 0), pady=(20, 0), sticky="nsew")
-    self.tabview.add("Tab 1")
-    self.tabview.add("Tab 2")
-    self.tabview.tab("Tab 2").grid_columnconfigure(0, weight=1)
+    self.tabview.add("Source")
+    self.tabview.add("Predict")
+    self.tabview.tab("Predict").grid_columnconfigure(0, weight=1)
 
-    # Create a button to open the camera in GUI app
-    self.label = tkinter.Label(self.tabview.tab("Tab 1"), text="oui")
-    self.label.pack()
+    # Create source & predict video feed
+    self.source_image = tkinter.Label(self.tabview.tab("Source"), text="source")
+    self.source_image.pack()
+    self.predict_image = tkinter.Label(self.tabview.tab("Predict"), text="predict")
+    self.predict_image.pack()
+
+    self.load_model()
+    self.open_camera()    
 
 
-    self.logo_label = customtkinter.CTkLabel(self.sidebar_frame, text="CustomTkinter", font=customtkinter.CTkFont(size=20, weight="bold"))
-    self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))    
+  def load_model(self):
+    self.model = YOLO('best.pt')
     
-    self.cap = cv2.VideoCapture(0)
+    self.class_list = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
 
-  def show_frames(self):
-    cv2image = cv2.cvtColor(self.cap.read()[1],cv2.COLOR_BGR2RGB) #grab image + colorspace
+    self.class_colors = [] #create colors for boxes
+    for i in range(26):
+      r = random.randint(0, 255)
+      g = random.randint(0, 255)
+      b = random.randint(0, 255)
+      self.class_colors.append((b,g,r))
+
+    print("[-] YOLOv8 loaded")
+
+
+  def open_camera(self):
+    self.cap = cv2.VideoCapture(0)
+    
+    if not self.cap.isOpened():
+      print("[X] Error while opening camera\nExiting...")
+      exit()
+    else:
+      print("[-] Camera opened")
+      self.get_source_feed()
+      self.get_predict_feed()
+
+
+  def get_source_feed(self):
+    ret, frame = self.cap.read()
+    
+    if not ret:
+      print("Not receiving frames (stream ended ?)\nExiting...")
+      exit()
+
+    cv2image = cv2.cvtColor(frame ,cv2.COLOR_BGR2RGB) #grab image + colorspace
+
     img = Image.fromarray(cv2image)
     imgtk = ImageTk.PhotoImage(image = img)
-    self.label.imgtk = imgtk
-    self.label.configure(image=imgtk)
-    self.label.after(20, self.show_frames)
+    self.source_image.imgtk = imgtk
+    self.source_image.configure(image=imgtk)
+
+    self.source_image.after(20, self.get_source_feed)
+
+
+  def get_predict_feed(self):
+    ret, frame = self.cap.read()
+
+    result_frame = self.predict(frame)
+  
+    cv2image = cv2.cvtColor(result_frame ,cv2.COLOR_BGR2RGB) #grab image + colorspace
+
+    img = Image.fromarray(cv2image)
+    imgtk = ImageTk.PhotoImage(image = img)
+    self.predict_image.imgtk = imgtk
+    self.predict_image.configure(image=imgtk)
+
+    self.predict_image.after(20, self.get_predict_feed)
+
+
+  def predict(self, frame):
+
+    frame_resized = cv2.resize(frame, (image_target_size, image_target_size)) #resize frame
+
+    #copy frame to image & make prediction
+    cv2.imwrite('ultralytics/inference/images/frame.png', frame_resized)
+    output = self.model(source='ultralytics/inference/images/frame.png', conf=0.25, save=False)
+
+    #keeping scales to resize again the frame when returning from the function
+    scale_x = frame.shape[1] / image_target_size
+    scale_y = frame.shape[0] / image_target_size
+
+    for box in output[0].boxes:
+
+      #label + confidence
+      clsID = box.cls.numpy()[0]
+      conf = box.conf.numpy()[0]
+      
+      #get boxes coordinates and draw them
+      bb = box.xyxy.numpy()[0]
+      xA = int(numpy.round(bb[0] * scale_x))
+      yA = int(numpy.round(bb[1] * scale_y))
+      xB = int(numpy.round(bb[2] * scale_x))
+      yB = int(numpy.round(bb[3] * scale_y))
+
+      cv2.rectangle(
+      frame, (xA, yA), (xB, yB), self.class_colors[int(clsID)], 3)
+
+      #display class name + confidence
+      font = cv2.FONT_HERSHEY_COMPLEX
+      cv2.putText(
+        frame,
+        self.class_list[int(clsID)]
+        + " "
+        + str(round(conf, 3))
+        + "%",
+        (xA, yA - 10),
+        font,
+        1,
+        (255, 255, 255),
+        2,
+      )
+
+    return frame
 
 if __name__ == "__main__":
   app = App()
-  app.show_frames()
   app.mainloop()
