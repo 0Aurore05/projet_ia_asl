@@ -1,3 +1,10 @@
+# install
+# pip install pillow
+#sudo apt install python3-tk
+# pip install customtkinter
+# pip install opencv-python
+# pip install ultralytics
+
 # Camera import
 from PIL import Image, ImageTk  
 import cv2
@@ -39,7 +46,16 @@ class App(customtkinter.CTk):
     self.logo_label = customtkinter.CTkLabel(self.sidebar_frame, text="CustomTkinter", font=customtkinter.CTkFont(size=20, weight="bold"))
     self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
-    # create tabview
+
+    self.tabview = customtkinter.CTkTabview(self, width=250)
+    self.tabview.grid(row=0, column=2, padx=(20, 0), pady=(20, 0), sticky="nsew")
+    self.tabview.add("Video")
+    self.source_image = tkinter.Label(self.tabview.tab("Video"))
+    self.source_image.grid(row=0, column=0)
+    self.predict_image = tkinter.Label(self.tabview.tab("Video"))
+
+    #OLD TABS FOR 'SOURCE' AND 'PREDICT'
+    """ # create tabview
     self.tabview = customtkinter.CTkTabview(self, width=250)
     self.tabview.grid(row=0, column=2, padx=(20, 0), pady=(20, 0), sticky="nsew")
     self.tabview.add("Source")
@@ -50,11 +66,25 @@ class App(customtkinter.CTk):
     self.source_image = tkinter.Label(self.tabview.tab("Source"), text="source")
     self.source_image.pack()
     self.predict_image = tkinter.Label(self.tabview.tab("Predict"), text="predict")
-    self.predict_image.pack()
+    self.predict_image.pack() """
+
+    self.capture_on = customtkinter.IntVar(value=0)
+    self.switch_predict = customtkinter.CTkSwitch(master=self, text=f"Toggle prediction", command = self.toggle_predict, variable=self.capture_on, onvalue=1, offvalue=0)
+    self.switch_predict.grid(row=0, column=0, padx=10, pady=(0, 20))
 
     self.load_model()
-    self.open_camera()    
+    self.open_camera()
 
+  def toggle_predict(self):
+
+    if self.switch_predict.get():
+      self.capture_on = True
+      print("[-] Starting predictions...")
+      self.predict_image.grid(row=0, column=0)
+      self.get_predict_feed()
+    else:
+      self.capture_on = False
+      self.predict_image.grid_forget()
 
   def load_model(self):
     self.model = YOLO('best.pt')
@@ -80,8 +110,6 @@ class App(customtkinter.CTk):
     else:
       print("[-] Camera opened")
       self.get_source_feed()
-      self.get_predict_feed()
-
 
   def get_source_feed(self):
     ret, frame = self.cap.read()
@@ -101,27 +129,28 @@ class App(customtkinter.CTk):
 
 
   def get_predict_feed(self):
-    ret, frame = self.cap.read()
+    if self.capture_on:
+      ret, frame = self.cap.read()
 
-    result_frame = self.predict(frame)
-  
-    cv2image = cv2.cvtColor(result_frame ,cv2.COLOR_BGR2RGB) #grab image + colorspace
+      result_frame = self.predict(frame)
+    
+      cv2image = cv2.cvtColor(result_frame ,cv2.COLOR_BGR2RGB) #grab image + colorspace
 
-    img = Image.fromarray(cv2image)
-    imgtk = ImageTk.PhotoImage(image = img)
-    self.predict_image.imgtk = imgtk
-    self.predict_image.configure(image=imgtk)
+      img = Image.fromarray(cv2image)
+      imgtk = ImageTk.PhotoImage(image = img)
+      self.predict_image.imgtk = imgtk
+      self.predict_image.configure(image=imgtk)
 
-    self.predict_image.after(20, self.get_predict_feed)
-
+      self.predict_image.after(20, self.get_predict_feed)
+    else:
+      self.predict_image.configure(image='')
+      print("[-] Stopping predictions")
 
   def predict(self, frame):
 
     frame_resized = cv2.resize(frame, (image_target_size, image_target_size)) #resize frame
 
-    #copy frame to image & make prediction
-    cv2.imwrite('ultralytics/inference/images/frame.png', frame_resized)
-    output = self.model(source='ultralytics/inference/images/frame.png', conf=0.25, save=False)
+    output = self.model.predict(source=frame_resized)
 
     #keeping scales to resize again the frame when returning from the function
     scale_x = frame.shape[1] / image_target_size
