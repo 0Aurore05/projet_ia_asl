@@ -2,6 +2,8 @@ from ultralytics import YOLO
 import numpy
 import cv2
 
+import subprocess
+
 model = YOLO('best.pt')
 
 ### IOU
@@ -47,7 +49,7 @@ def iou(xA, yA, xB, yB):
       1,
     )
 
-for i in range(1, 261):
+for i in range(1, 30):
 
   image_name = "annoted/test/images/frame_"+ str(i) + ".jpg"
   label_name = "annoted/test/labels/frame_"+ str(i) + ".txt"
@@ -90,7 +92,7 @@ for i in range(1, 261):
     font = cv2.FONT_HERSHEY_DUPLEX
     cv2.putText(
       image,
-      class_list[int(label)-1],
+      class_list[int(label)],
       (xA + int(width) - 25, yA + 23),
       font,
       0.7,
@@ -102,5 +104,5 @@ for i in range(1, 261):
 
   cv2.imwrite("RESULTS_IOU/frame_" + str(i) + ".jpg", image)
 
-
-
+cmd_str = "ffmpeg -f image2 -i RESULTS_IOU/frame_%d.jpg RESULTS_IOU/out.mp4"
+subprocess.run(cmd_str, shell=True)
