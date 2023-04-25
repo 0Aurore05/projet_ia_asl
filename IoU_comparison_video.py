@@ -49,7 +49,7 @@ def iou(xA, yA, xB, yB):
       1,
     )
 
-for i in range(1, 30):
+for i in range(1, 261):
 
   image_name = "annoted/test/images/frame_"+ str(i) + ".jpg"
   label_name = "annoted/test/labels/frame_"+ str(i) + ".txt"
