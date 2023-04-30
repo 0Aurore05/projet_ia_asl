@@ -164,8 +164,18 @@ Changer cette option donnera au modèle des images de tailles différentes, pour
   def get_image_inference(self):
     filename = filedialog.askopenfilename()
     if filename and not self.switch_predict.get():
-      self.model.predict(source=filename, show=True)
-      cv2.destroyAllWindows()
+
+      pil_image = Image.open(filename)
+      opencvImage = cv2.cvtColor(numpy.array(pil_image), cv2.COLOR_RGB2BGR)
+
+      frame = self.predict_frame(opencvImage)
+      cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+      img = Image.fromarray(cv2image)
+      imgtk = ImageTk.PhotoImage(image = img)
+      self.video_feed.imgtk = imgtk
+      self.video_feed.configure(image=imgtk)
+
     
   def get_camera_indexes(self):
     # checks the first 10 indexes for devices
