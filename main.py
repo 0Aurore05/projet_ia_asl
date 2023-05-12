@@ -1,10 +1,3 @@
-# install
-# pip install pillow
-#sudo apt install python3-tk
-# pip install customtkinter
-# pip install opencv-python
-# pip install ultralytics
-
 # Camera import
 from PIL import Image, ImageTk  
 import cv2
